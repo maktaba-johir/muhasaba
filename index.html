@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ডিজিটাল আমলের মুহাসাবা</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#059669">
+    <link rel="apple-touch-icon" href="icon.png">
+
+    <style>
+        :root { 
+            --primary: #059669; 
+            --white: #ffffff; 
+        }
+        
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #e0f2f1 0%, #f1f8e9 100%);
+            margin: 0; padding: 10px; min-height: 100vh;
+        }
+        
+        .container { 
+            max-width: 1200px; margin: auto; background: var(--white); 
+            padding: 15px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+            text-align: center; margin-bottom: 80px;
+        }
+        
+        h2 { 
+            color: var(--white); background: linear-gradient(to right, #059669, #10b981);
+            padding: 12px; border-radius: 10px; font-size: 1.2rem; margin-bottom: 20px;
+        }
+
+        .month-links { 
+            display: flex; overflow-x: auto; gap: 8px; margin-bottom: 20px; 
+            padding-bottom: 10px; border-bottom: 2px solid #f1f5f9; 
+        }
+        
+        .month-link { 
+            text-decoration: none; color: #475569; padding: 8px 15px; 
+            border-radius: 20px; background: #f1f5f9; font-size: 13px; font-weight: bold;
+            white-space: nowrap;
+        }
+        
+        .month-link.active { background: var(--primary); color: white; }
+
+        .table-container { 
+            overflow: auto; max-height: 65vh; border: 1px solid #e2e8f0; border-radius: 8px;
+        }
+
+        table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        
+        th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: center; font-size: 13px; }
+        
+        thead th { position: sticky; top: 0; background: #f8fafc; color: var(--primary); z-index: 10; }
+
+        .sticky-col { position: sticky; left: 0; background: #f8fafc !important; font-weight: bold; min-width: 140px; z-index: 11; }
+
+        .total-col { position: sticky; right: 0; background: #f0fdf4 !important; font-weight: bold; z-index: 9; }
+
+        .group-header { background: #f0fdf4 !important; color: var(--primary); font-weight: bold; }
+
+        input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; }
+
+        .para-input { width: 35px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px; text-align: center; }
+
+        .save-btn {
+            position: fixed; bottom: 20px; right: 20px;
+            background: #059669; color: white; border: none;
+            padding: 15px 25px; border-radius: 50px; font-size: 16px;
+            font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>✨ আমলের মুহাসাবা - ২০২৬ ✨</h2>
+    <nav class="month-links" id="monthNav"></nav>
+
+    <div class="table-container">
+        <table id="muhasabaTable">
+            <thead><tr id="headerRow"></tr></thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<button class="save-btn" onclick="saveData()">সেভ করুন 💾</button>
+
+<script>
+    // আগের সব জাভাস্ক্রিপ্ট ফাংশন এখানে থাকবে...
+    const months = ["জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"];
+    const amals = [
+        { group: "জামাতের সাথে নামায 🕌", items: ["ফজর", "যোহর", "আসর", "মাগরিব", "এশা", "বেতর"] },
+        { group: "সুন্নাত নামায 🛐", items: ["ফজরের পূর্বের সুন্নাত", "যোহরের পূর্বের সুন্নাত", "যোহরের পরের সুন্নাত", "মাগরিবের পরের সুন্নাত", "এশার পরের সুন্নাত"] },
+        { group: "নফল নামায ✨", items: ["তাহাজ্জুদ", "ইশরাক", "চাশত/দুহা", "আউওয়াবীন"] },
+        { group: "তেলাওয়াত 📖", items: ["ইয়াসিন", "ওয়াক্বিয়া", "মুলক", "পঠিত পারা/পৃষ্ঠা"] }
+    ];
+
+    let currentMonthIndex = 0;
+    let hasUnsavedChanges = false;
+
+    function init() { 
+        renderNav(); 
+        loadTable(); 
+        // সার্ভিস ওয়ার্কার রেজিস্টার করা
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js');
+        }
+    }
+
+    function renderNav() {
+        const nav = document.getElementById('monthNav');
+        nav.innerHTML = '';
+        months.forEach((m, index) => {
+            const a = document.createElement('a');
+            a.className = `month-link ${index === currentMonthIndex ? 'active' : ''}`;
+            a.href = "#"; a.innerText = m;
+            a.onclick = (e) => {
+                e.preventDefault();
+                if (hasUnsavedChanges) {
+                    if (!confirm("আপনার পরিবর্তনগুলো সেভ করা হয়নি। আপনি কি অন্য মাসে যেতে চান?")) return;
+                }
+                currentMonthIndex = index;
+                hasUnsavedChanges = false;
+                renderNav(); loadTable();
+            };
+            nav.appendChild(a);
+        });
+    }
+
+    function loadTable() {
+        const days = (currentMonthIndex === 1) ? 28 : ([3, 5, 8, 10].includes(currentMonthIndex) ? 30 : 31);
+        const headerRow = document.getElementById('headerRow');
+        const tableBody = document.getElementById('tableBody');
+
+        headerRow.innerHTML = `<th class="sticky-col">আমল</th>` + Array.from({length: days}, (_, i) => `<th>${i+1}</th>`).join('') + `<th class="total-col">মোট</th>`;
+
+        tableBody.innerHTML = '';
+        const savedData = JSON.parse(localStorage.getItem(`muhasaba_${currentMonthIndex}`)) || {};
+
+        amals.forEach((group, gIdx) => {
+            const gRow = document.createElement('tr');
+            gRow.innerHTML = `<td class="sticky-col group-header">${group.group}</td><td colspan="${days + 1}" class="group-header"></td>`;
+            tableBody.appendChild(gRow);
+
+            group.items.forEach((item, itemIdx) => {
+                const row = document.createElement('tr');
+                const id = `row-${gIdx}-${itemIdx}`;
+                let cells = `<td class="sticky-col">${item}</td>`;
+
+                for (let i = 1; i <= days; i++) {
+                    const key = `${id}-day-${i}`;
+                    const val = savedData[key] || "";
+                    if (item === "পঠিত পারা/পৃষ্ঠা") {
+                        cells += `<td><input type="number" class="para-input ${id}" oninput="markChanged(); calculateParaTotal('${id}')" value="${val}" placeholder="0"></td>`;
+                    } else {
+                        const checked = val === true ? "checked" : "";
+                        cells += `<td><input type="checkbox" class="${id}" onchange="markChanged(); calculateCheckTotal('${id}')" ${checked}></td>`;
+                    }
+                }
+                cells += `<td class="total-col" id="total-${id}">0</td>`;
+                row.innerHTML = cells;
+                tableBody.appendChild(row);
+                
+                if (item === "পঠিত পারা/পৃষ্ঠা") calculateParaTotal(id);
+                else calculateCheckTotal(id);
+            });
+        });
+    }
+
+    function markChanged() { hasUnsavedChanges = true; }
+
+    window.calculateCheckTotal = (id) => {
+        const inputs = document.querySelectorAll(`.${id}`);
+        const totalCell = document.getElementById(`total-${id}`);
+        let count = 0;
+        inputs.forEach(input => { if (input.checked) count++; });
+        totalCell.innerText = count;
+    };
+
+    window.calculateParaTotal = (id) => {
+        const inputs = document.querySelectorAll(`.${id}`);
+        const totalCell = document.getElementById(`total-${id}`);
+        let sum = 0;
+        inputs.forEach(input => {
+            let val = parseFloat(input.value);
+            if (!isNaN(val)) sum += val;
+        });
+        totalCell.innerText = sum;
+    };
+
+    function saveData() {
+        const dataToSave = {};
+        amals.forEach((group, gIdx) => {
+            group.items.forEach((item, itemIdx) => {
+                const id = `row-${gIdx}-${itemIdx}`;
+                const inputs = document.querySelectorAll(`.${id}`);
+                inputs.forEach((input, dayIdx) => {
+                    const key = `${id}-day-${dayIdx + 1}`;
+                    dataToSave[key] = (item === "পঠিত পারা/পৃষ্ঠা") ? input.value : input.checked;
+                });
+            });
+        });
+        localStorage.setItem(`muhasaba_${currentMonthIndex}`, JSON.stringify(dataToSave));
+        hasUnsavedChanges = false;
+        alert("আপনার আমলনামা সফলভাবে সেভ করা হয়েছে! ✅");
+    }
+
+    init();
+</script>
+
+</body>
+</html>
